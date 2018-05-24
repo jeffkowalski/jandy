@@ -36,64 +36,79 @@ class Jandy < Thor
   class_option :log,     :type => :boolean, :default => true, :desc => "log output to ~/.jandy.log"
   class_option :verbose, :type => :boolean, :aliases => "-v", :desc => "increase verbosity"
 
+  desc "foo", "testing"
+  def foo
+    setup_logger
+
+    require 'yaml'
+    require 'rest-client'
+    require 'json'
+
+    api_key = 'EOOEMOW4YR6QNB07'
+    credentials = YAML.load_file CREDENTIALS_PATH
+
+    res = RestClient.post 'https://support.iaqualink.com/users/sign_in.json',
+                          {api_key: api_key,
+                           email: credentials[:username],
+                           password: credentials[:password]}
+    session = JSON::parse res
+
+    res = RestClient.get "https://support.iaqualink.com/devices.json",
+                         {params: {api_key: api_key,
+                                   authentication_token: session['authentication_token'],
+                                   user_id: session['id']}}
+    devices = JSON::parse res
+
+    res = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+		         {params: {actionID: 'command',
+		                   command: 'get_home',
+		                   serial: devices[0]['serial_number'],
+		                   sessionID: session['session_id']}}
+    puts res
+  end
+
 
   desc "zzz", "testing"
   def zzz
     setup_logger
 
-
     credentials = YAML.load_file CREDENTIALS_PATH
 
     api_key = 'EOOEMOW4YR6QNB07'
-    device_serial = credentials[:serial].tr('-','')
-    session_id = nil
 
-    uri = URI.parse('https://support.iaqualink.com')
+    uri = URI.parse('https://support.iaqualink.com/users/sign_in.json')
     https = Net::HTTP.new(uri.host,uri.port)
     https.use_ssl = true
-    https.verify_mode = OpenSSL::SSL::VERIFY_NONE
+    req = Net::HTTP::Post.new(uri.path)
+    req.body = {'api_key' => api_key,
+                'email' => credentials[:username],
+                'password' => credentials[:password]}.to_json
+    req['content-type'] = 'application/json'
+    res = https.request(req)
+    session = JSON::parse res.body
 
-    https.start do |https|
-      puts "\n--------------------------------------------------------------------------\n"
-      uri = URI.parse('https://support.iaqualink.com/users/sign_in.json')
-      puts uri
-      req = Net::HTTP::Post.new(uri.path)
-      req.body = {'api_key' => api_key,
-                  'email' => credentials[:username],
-                  'password' => credentials[:password]}.to_json
+    uri = URI.parse('https://support.iaqualink.com/devices.json' +
+                    '?api_key=' + api_key +
+                    '&authentication_token=' + session['authentication_token'] +
+                    '&user_id=' + session['id'].to_s)
+    puts uri
+    https = Net::HTTP.new(uri.host,uri.port)
+    https.use_ssl = true
+    req = Net::HTTP::Get.new(uri)
+    res = https.request(req)
+    devices = JSON::parse res.body
+    puts devices[0]['serial_number']
 
-      req['content-type'] = 'application/json'
-      p req.to_hash
-      res = https.request(req)
 
-      p "Response:"
-      puts res
-      res.header.each_header {|key,value| puts "#{key} = #{value}" }
-      puts res.body
 
-      result = JSON::parse(res.body)
-      session_id = result['session_id']
-      authentication_token = result['authentication_token']
-      user_id = result['id'].to_s
 
-      puts "\n--------------------------------------------------------------------------\n"
+    p "Response:"
+    puts res
+    res.header.each_header { |key,value| puts "#{key} = #{value}" }
+    puts res.body
+    exit
 
-      uri = URI.parse('https://support.iaqualink.com/devices.json' +
-                      '?api_key=' + api_key +
-                      '&authentication_token=' + authentication_token +
-                      '&user_id=' + user_id)
-      puts uri
-      req = Net::HTTP::Get.new(uri.path)
-      p req.to_hash
-      res = https.request(req)
-
-      p "Response:"
-      puts res
-      res.header.each_header {|key,value| puts "#{key} = #{value}" }
-      puts res.body
-
-    end
-
+    device_serial = session_id = ''
     puts "\n--------------------------------------------------------------------------\n"
 
     uri = URI.parse('https://iaqualink-api.realtime.io/v1/mobile/session.json' +

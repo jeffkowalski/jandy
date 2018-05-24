@@ -3,6 +3,7 @@ ruby '2.3.1'
 
 gem 'andand'
 gem 'thor'
+gem 'rest-client'
 
 # for robe:
 gem 'pry'
