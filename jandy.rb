@@ -46,24 +46,18 @@ class Jandy < Thor
     api_key = 'EOOEMOW4YR6QNB07'
     credentials = YAML.load_file CREDENTIALS_PATH
 
-    res = RestClient.post 'https://support.iaqualink.com/users/sign_in.json',
-                          {api_key: api_key,
-                           email: credentials[:username],
-                           password: credentials[:password]}
-    session = JSON::parse res
+    response = RestClient.post 'https://support.iaqualink.com/users/sign_in.json',
+                               {api_key: api_key,
+                                email: credentials[:username],
+                                password: credentials[:password]}
+    session = JSON::parse response
 
-    res = RestClient.get "https://support.iaqualink.com/devices.json",
-                         {params: {api_key: api_key,
-                                   authentication_token: session['authentication_token'],
-                                   user_id: session['id']}}
-    devices = JSON::parse res
-
-    res = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
-		         {params: {actionID: 'command',
-		                   command: 'get_home',
-		                   serial: devices[0]['serial_number'],
-		                   sessionID: session['session_id']}}
-    puts res
+    response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+        	              {params: {actionID: 'command',
+		                        command: 'get_home',
+		                        serial: credentials[:serial_number],
+		                        sessionID: session['session_id']}}
+    puts response
   end
 
 end
