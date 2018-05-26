@@ -1,7 +1,5 @@
 source 'https://rubygems.org'
-ruby '2.3.1'
 
-gem 'andand'
 gem 'thor'
 gem 'rest-client'
 
