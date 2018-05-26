@@ -103,6 +103,8 @@ Source code
   wget -O- https://touch.zodiacpoolsystems.com/files/scripts/netlink.js\?1524415822  # (parameter, which is the current time, doesn't seem useful)
 #+END_SRC
 
+#+RESULTS:
+
 Install prettier, for elisp package used in code below
 #+BEGIN_SRC shell
   curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
@@ -124,6 +126,12 @@ Improve readability of netlink code
     (while (not (looking-at "^$"))
       (kill-line))
     (kill-line)
+
+    ;; remove ^M
+    (message "removing ^M...")
+    (save-excursion
+      (while (re-search-forward "" nil t)
+        (replace-match "")))
 
     ;; (prettier-js)
     (message "writing file...")
