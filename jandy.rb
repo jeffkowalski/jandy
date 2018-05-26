@@ -6,7 +6,7 @@ require 'thor'
 
 
 LOGFILE = File.join(Dir.home, '.jandy.log')
-CREDENTIALS_PATH = File.join(Dir.home, '.credentials', "iaqualink.yml")
+CREDENTIALS_PATH = File.join(Dir.home, '.credentials', "iaqualink.yaml")
 
 
 class Jandy < Thor
