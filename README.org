@@ -27,9 +27,10 @@ ruby ./jandy.rb describe-status --no-log --verbose
 #+END_SRC
 
 Which will yield something similar to the following:
-#+RESULTS:
+#+BEGIN_EXAMPLE
 I, [2018-06-30T20:37:59.003455 #26076]  INFO -- : starting
 The pool temperature is unknown.
 The air temperature is 74 degrees.
 The filter pump is off.
 The solar panels are off.
+#+END_EXAMPLE
