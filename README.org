@@ -1,0 +1,35 @@
+* Installation
+1. clone the git repo
+2. install required gems
+
+#+BEGIN_SRC shell
+bundle install
+#+END_SRC
+
+* Configuration
+Build a ~/.credentials/iaqualink.yaml file with contents similar to
+
+#+BEGIN_EXAMPLE
+ruby ./jandy.rb describe-status --no-log --verbose
+---
+:username: 'your username'
+:password: 'your password'
+:location: 'location of pool, as shown in iAquaLink website'
+:serial_number:   'four hyphen-separated triples, like DAR-2VR-A7N-JR2'
+#+END_EXAMPLE
+
+* Running
+Normally, you'll want to run with the log turned off, and perhaps increased verbosity.
+The _describe-status_ command shows helpful information about the pool:
+
+#+BEGIN_SRC shell :results replace raw
+ruby ./jandy.rb describe-status --no-log --verbose
+#+END_SRC
+
+Which will yield something similar to the following:
+#+RESULTS:
+I, [2018-06-30T20:37:59.003455 #26076]  INFO -- : starting
+The pool temperature is unknown.
+The air temperature is 74 degrees.
+The filter pump is off.
+The solar panels are off.
