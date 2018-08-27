@@ -151,6 +151,41 @@ class Jandy < Thor
             "The solar panels are #{describe_mode status['solar_heater']}."].join "\n"
     puts text
   end
+
+  desc "record-status", "record the current state of the pool to database"
+  def record_status
+    setup_logger
+
+    require 'yaml'
+    require 'rest-client'
+    require 'json'
+
+    api_key = 'EOOEMOW4YR6QNB07'
+    credentials = YAML.load_file CREDENTIALS_PATH
+
+    response = RestClient.post 'https://support.iaqualink.com/users/sign_in.json',
+                               {api_key: api_key,
+                                email: credentials[:username],
+                                password: credentials[:password]}
+    session = JSON::parse response
+
+    response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+        	              {params: {actionID: 'command',
+		                        command: 'get_home',
+		                        serial: credentials[:serial_number],
+		                        sessionID: session['session_id']}}
+    status = JSON::parse response
+    status = status['home_screen'].reduce(:merge)
+
+    timestamp = Time.now.iso8601
+    open(File.join(Dir.home, '.pool.dat'), 'a') { |f|
+      f.puts timestamp + "\t" + "pool_temp=#{status['pool_temp']}"  unless status['pool_temp'].empty?
+      f.puts timestamp + "\t" + "air_temp=#{status['air_temp']}"    unless status['air_temp'].empty?
+      f.puts timestamp + "\t" + "filter_pump=#{describe_mode(status['pool_pump'])}"
+      f.puts timestamp + "\t" + "solar_heater=#{describe_mode(status['solar_heater'])}"
+    }
+  end
+
 end
 
 Jandy.start
