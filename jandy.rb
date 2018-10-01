@@ -3,6 +3,7 @@
 require 'mechanize'
 require 'date'
 require 'thor'
+require 'influxdb'
 
 
 LOGFILE = File.join(Dir.home, '.jandy.log')
@@ -177,13 +178,36 @@ class Jandy < Thor
     status = JSON::parse response
     status = status['home_screen'].reduce(:merge)
 
-    timestamp = Time.now.iso8601
-    open(File.join(Dir.home, '.pool.dat'), 'a') { |f|
-      f.puts timestamp + "\t" + "pool_temp=#{status['pool_temp']}"  unless status['pool_temp'].empty?
-      f.puts timestamp + "\t" + "air_temp=#{status['air_temp']}"    unless status['air_temp'].empty?
-      f.puts timestamp + "\t" + "filter_pump=#{describe_mode(status['pool_pump'])}"
-      f.puts timestamp + "\t" + "solar_heater=#{describe_mode(status['solar_heater'])}"
+    influxdb = InfluxDB::Client.new 'jandy'
+    timestamp = Time.now.to_i
+
+    data = {
+      values: {value: status['pool_pump'].to_i, description: describe_mode(status['pool_pump'])},
+      timestamp: timestamp
     }
+    influxdb.write_point('filter_pump', data)
+
+    data = {
+      values: {value: status['solar_heater'].to_i, description: describe_mode(status['solar_heater'])},
+      timestamp: timestamp
+    }
+    influxdb.write_point('solar_heater', data)
+
+    if not status['pool_temp'].empty?
+      data = {
+        values: {value: status['pool_temp'].to_i},
+        timestamp: timestamp
+      }
+      influxdb.write_point('pool_temp', data)
+    end
+
+    if not status['air_temp'].empty?
+      data = {
+        values: {value: status['air_temp'].to_i},
+        timestamp: timestamp
+      }
+      influxdb.write_point('air_temp', data)
+    end
   end
 
 end

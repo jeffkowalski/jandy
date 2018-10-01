@@ -6,6 +6,7 @@ GEM
       unf (>= 0.0.5, < 1.0.0)
     http-cookie (1.0.3)
       domain_name (~> 0.5)
+    influxdb (0.6.1)
     method_source (0.9.0)
     mime-types (3.2.2)
       mime-types-data (~> 3.2015)
@@ -31,6 +32,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  influxdb
   method_source (>= 0.8.2)
   pry
   pry-doc (>= 0.6.0)
@@ -38,4 +40,4 @@ DEPENDENCIES
   thor
 
 BUNDLED WITH
-   1.16.4
+   1.16.5
