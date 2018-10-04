@@ -66,6 +66,7 @@ class Jandy < Thor
     api_key = 'EOOEMOW4YR6QNB07'
     credentials = YAML.load_file CREDENTIALS_PATH
 
+    $logger.info "Session"
     response = RestClient.post 'https://support.iaqualink.com/users/sign_in.json',
                                {api_key: api_key,
                                 email: credentials[:username],
@@ -73,6 +74,7 @@ class Jandy < Thor
     session = JSON::parse response
     puts session
 
+    $logger.info "get_home"
     response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
         	              {params: {actionID: 'command',
         	                        command: 'get_home',
@@ -81,9 +83,11 @@ class Jandy < Thor
         	                        serial: credentials[:serial_number],
         	                        sessionID: session['session_id']}}
     status = JSON::parse response
+    $logger.info "get_home - home_screen"
     status = status['home_screen'].reduce(:merge)
     puts status
 
+    $logger.info "get_home - response"
     # "AQU='70','0C 00 01 02 03 04 05 06 07 08 0E 0F 1A 01 00 00 00 03 00 66 00 68 00 3A 00 47 00 00 00'"
     measures = status['response'].split(',')[1].split(' ').map { |m| m.to_i(16) }
     # index 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18  19 20  21 22 23 24  25 26 27 28
@@ -98,6 +102,7 @@ class Jandy < Thor
     # 25 = pool temp
     puts measures.join ' '
 
+    $logger.info "get_onetouch"
     response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
         	              {params: {actionID: 'command',
         	                        command: 'get_onetouch',
@@ -106,12 +111,22 @@ class Jandy < Thor
     status = JSON::parse response
     puts status
 
-    # res = RestClient.get "https://support.iaqualink.com/devices.json",
-    #                      {params: {api_key: api_key,
-    #                                authentication_token: session['authentication_token'],
-    #                                user_id: session['id']}}
-    # devices = JSON::parse res
-    # puts devices
+    $logger.info "get_devices"
+    response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+        	              {params: {actionID: 'command',
+        	                        command: 'get_devices',
+        	                        serial: credentials[:serial_number],
+        	                        sessionID: session['session_id']}}
+    status = JSON::parse response
+    puts status
+
+    $logger.info "devices.json"
+    res = RestClient.get "https://support.iaqualink.com/devices.json",
+                          {params: {api_key: api_key,
+                                    authentication_token: session['authentication_token'],
+                                    user_id: session['id']}}
+     devices = JSON::parse res
+     puts devices
 
     # response = RestClient.post "https://support.iaqualink.com/devices/QAR2QRS8NVE2/execute_read_command.json",
     #                            {api_key: api_key,
