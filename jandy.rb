@@ -117,16 +117,32 @@ class Jandy < Thor
         	                        command: 'get_devices',
         	                        serial: credentials[:serial_number],
         	                        sessionID: session['session_id']}}
-    status = JSON::parse response
-    puts status
+    devices = JSON::parse response
+    # {"message"=>"",
+    #  "devices_screen"=>[{"status"=>"Online"},
+    #                     {"response"=>"AQU='72','7|1|2|3|4|5|6|7|0|1|0|0|Cleaner|0|1|0|0|Air Blower|0|1|0|0|Aux3|0|1|0|0|Aux4|0|1|0|0|Aux5|0|1|0|0|Aux6|0|1|0|0|Aux7'"},
+    #                     {"group"=>"1"},
+    #                     {"aux_1"=>[{"state"=>"0"}, {"label"=>"Cleaner"},    {"icon"=>"aux_1_0.png"}, {"type"=>"0"}, {"subtype"=>"0"}]},
+    #                     {"aux_2"=>[{"state"=>"0"}, {"label"=>"Air Blower"}, {"icon"=>"aux_1_0.png"}, {"type"=>"0"}, {"subtype"=>"0"}]},
+    #                     {"aux_3"=>[{"state"=>"0"}, {"label"=>"Aux3"},       {"icon"=>"aux_1_0.png"}, {"type"=>"0"}, {"subtype"=>"0"}]},
+    #                     {"aux_4"=>[{"state"=>"0"}, {"label"=>"Aux4"},       {"icon"=>"aux_1_0.png"}, {"type"=>"0"}, {"subtype"=>"0"}]},
+    #                     {"aux_5"=>[{"state"=>"0"}, {"label"=>"Aux5"},       {"icon"=>"aux_1_0.png"}, {"type"=>"0"}, {"subtype"=>"0"}]},
+    #                     {"aux_6"=>[{"state"=>"0"}, {"label"=>"Aux6"},       {"icon"=>"aux_1_0.png"}, {"type"=>"0"}, {"subtype"=>"0"}]},
+    #                     {"aux_7"=>[{"state"=>"0"}, {"label"=>"Aux7"},       {"icon"=>"aux_1_0.png"}, {"type"=>"0"}, {"subtype"=>"0"}]}]}
+    puts devices
+    aux = devices['devices_screen'].select { |node|
+      (not node.keys.grep(/aux_/).empty?) && (node.values.first.reduce(Hash.new, :merge)['label']=='Cleaner')
+    }
+    cleaner = aux.first.values.first.reduce(Hash.new, :merge)
+    puts cleaner
 
     $logger.info "devices.json"
     res = RestClient.get "https://support.iaqualink.com/devices.json",
                           {params: {api_key: api_key,
                                     authentication_token: session['authentication_token'],
                                     user_id: session['id']}}
-     devices = JSON::parse res
-     puts devices
+    devices = JSON::parse res
+    puts devices
 
     # response = RestClient.post "https://support.iaqualink.com/devices/QAR2QRS8NVE2/execute_read_command.json",
     #                            {api_key: api_key,
@@ -161,10 +177,22 @@ class Jandy < Thor
     status = JSON::parse response
     status = status['home_screen'].reduce(:merge)
 
+    response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+        	              {params: {actionID: 'command',
+        	                        command: 'get_devices',
+        	                        serial: credentials[:serial_number],
+        	                        sessionID: session['session_id']}}
+    devices = JSON::parse response
+    aux = devices['devices_screen'].select { |node|
+      (not node.keys.grep(/aux_/).empty?) && (node.values.first.reduce(Hash.new, :merge)['label']=='Cleaner')
+    }
+    cleaner = aux.first.values.first.reduce(Hash.new, :merge)
+
     text = ["The pool temperature is #{status['pool_temp'].empty? ? 'unknown' : (status['pool_temp'] + ' degrees')}.",
             "The air temperature is #{status['air_temp'].empty? ? 'unknown' : (status['air_temp'] + ' degrees')}.",
             "The filter pump is #{describe_mode status['pool_pump']}.",
-            "The solar panels are #{describe_mode status['solar_heater']}."].join "\n"
+            "The solar panels are #{describe_mode status['solar_heater']}.",
+            "The cleaner is #{describe_mode cleaner['state']}."].join "\n"
     puts text
   end
 
@@ -193,6 +221,17 @@ class Jandy < Thor
     status = JSON::parse response
     status = status['home_screen'].reduce(:merge)
 
+    response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+        	              {params: {actionID: 'command',
+        	                        command: 'get_devices',
+        	                        serial: credentials[:serial_number],
+        	                        sessionID: session['session_id']}}
+    devices = JSON::parse response
+    aux = devices['devices_screen'].select { |node|
+      (not node.keys.grep(/aux_/).empty?) && (node.values.first.reduce(Hash.new, :merge)['label']=='Cleaner')
+    }
+    cleaner = aux.first.values.first.reduce(Hash.new, :merge)
+
     influxdb = InfluxDB::Client.new 'jandy'
     timestamp = Time.now.to_i
 
@@ -207,6 +246,12 @@ class Jandy < Thor
       timestamp: timestamp
     }
     influxdb.write_point('solar_heater', data)
+
+    data = {
+      values: {value: cleaner['state'].to_i, description: describe_mode(cleaner['state'])},
+      timestamp: timestamp
+    }
+    influxdb.write_point('cleaner', data)
 
     if not status['pool_temp'].empty?
       data = {
