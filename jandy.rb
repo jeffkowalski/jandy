@@ -6,7 +6,7 @@ require 'thor'
 require 'influxdb'
 
 
-LOGFILE = File.join(Dir.home, '.log', '.jandy.log')
+LOGFILE = File.join(Dir.home, '.log', 'jandy.log')
 CREDENTIALS_PATH = File.join(Dir.home, '.credentials', "iaqualink.yaml")
 
 
