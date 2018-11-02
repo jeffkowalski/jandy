@@ -1,6 +1,5 @@
 #!/usr/bin/env ruby
 
-require 'mechanize'
 require 'date'
 require 'thor'
 require 'influxdb'
