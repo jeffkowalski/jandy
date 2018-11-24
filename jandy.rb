@@ -32,7 +32,7 @@ class Jandy < Thor
     end
   }
 
-  class_option :log,     :type => :boolean, :default => true, :desc => "log output to ~/.jandy.log"
+  class_option :log,     :type => :boolean, :default => true, :desc => "log output to #{LOGFILE}"
   class_option :verbose, :type => :boolean, :aliases => "-v", :desc => "increase verbosity"
 
 
