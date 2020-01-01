@@ -36,7 +36,6 @@ class Jandy < Thor
 
   class_option :log,     type: :boolean, default: true, desc: "log output to #{LOGFILE}"
   class_option :verbose, type: :boolean, aliases: '-v', desc: 'increase verbosity'
-  class_option :dry_run, type: :boolean, aliases: '-d', desc: 'do not write to database'
 
   no_commands do
     def describe_mode(mode)
@@ -197,6 +196,7 @@ class Jandy < Thor
   end
 
   desc 'record-status', 'record the current state of the pool to database'
+  method_option :dry_run, type: :boolean, aliases: '-d', desc: 'do not write to database'
   def record_status
     setup_logger
 
