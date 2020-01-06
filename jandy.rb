@@ -217,7 +217,7 @@ class Jandy < Thor
                                           sessionID: session['session_id'] }
       status = JSON.parse response
       status = status['home_screen'].reduce(:merge)
-      @logger.debug status
+      @logger.info status
 
       response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
                                 params: { actionID: 'command',
