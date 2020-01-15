@@ -11,6 +11,21 @@ require 'json'
 LOGFILE = File.join(Dir.home, '.log', 'jandy.log')
 CREDENTIALS_PATH = File.join(Dir.home, '.credentials', 'iaqualink.yaml')
 
+module Kernel
+  def with_rescue(exceptions, logger, retries: 5)
+    try = 0
+    begin
+      yield try
+    rescue *exceptions => e
+      try += 1
+      raise if try > retries
+
+      logger.info "caught error #{e.class}, retrying (#{try}/#{retries})..."
+      retry
+    end
+  end
+end
+
 class Jandy < Thor
   no_commands do
     def redirect_output
@@ -204,27 +219,34 @@ class Jandy < Thor
       api_key = 'EOOEMOW4YR6QNB07'
       credentials = YAML.load_file CREDENTIALS_PATH
 
-      response = RestClient.post 'https://support.iaqualink.com/users/sign_in.json',
-                                 api_key: api_key,
-                                 email: credentials[:username],
-                                 password: credentials[:password]
-      session = JSON.parse response
+      session = with_rescue([RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout], @logger) do |_try|
+        response = RestClient.post 'https://support.iaqualink.com/users/sign_in.json',
+                                   api_key: api_key,
+                                   email: credentials[:username],
+                                   password: credentials[:password]
+        JSON.parse response
+      end
 
-      response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
-                                params: { actionID: 'command',
-                                          command: 'get_home',
-                                          serial: credentials[:serial_number],
-                                          sessionID: session['session_id'] }
-      status = JSON.parse response
+      status = with_rescue([RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout], @logger) do |_try|
+        response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+                                  params: { actionID: 'command',
+                                            command: 'get_home',
+                                            serial: credentials[:serial_number],
+                                            sessionID: session['session_id'] }
+        JSON.parse response
+      end
       status = status['home_screen'].reduce(:merge)
       @logger.info status
 
-      response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
-                                params: { actionID: 'command',
-                                          command: 'get_devices',
-                                          serial: credentials[:serial_number],
-                                          sessionID: session['session_id'] }
-      devices = JSON.parse response
+      devices = with_rescue([RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout], @logger) do |_try|
+        response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+                                  params: { actionID: 'command',
+                                            command: 'get_devices',
+                                            serial: credentials[:serial_number],
+                                            sessionID: session['session_id'] }
+        JSON.parse response
+      end
+
       aux = devices['devices_screen'].select do |node|
         !node.keys.grep(/aux_/).empty? && (node.values.first.reduce({}, :merge)['label'] == 'Cleaner')
       end
