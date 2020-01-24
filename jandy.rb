@@ -238,6 +238,11 @@ class Jandy < Thor
       status = status['home_screen'].reduce(:merge)
       @logger.info status
 
+      if status['status'] == 'Service'
+        @logger.info 'in service mode, cannot query devices'
+        return
+      end
+
       devices = with_rescue([RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout], @logger) do |_try|
         response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
                                   params: { actionID: 'command',
