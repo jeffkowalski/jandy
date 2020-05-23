@@ -238,8 +238,12 @@ class Jandy < Thor
       status = status['home_screen'].reduce(:merge)
       @logger.info status
 
-      if status['status'] == 'Service'
+      case status['status']
+      when 'Service'
         @logger.info 'in service mode, cannot query devices'
+        return
+      when 'Offline'
+        @logger.info 'offline, cannot query devices'
         return
       end
 
