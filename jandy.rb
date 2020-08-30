@@ -219,7 +219,7 @@ class Jandy < Thor
       api_key = 'EOOEMOW4YR6QNB07'
       credentials = YAML.load_file CREDENTIALS_PATH
 
-      session = with_rescue([RestClient::BadGateway, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout], @logger) do |_try|
+      session = with_rescue([RestClient::BadGateway, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError], @logger) do |_try|
         response = RestClient.post 'https://support.iaqualink.com/users/sign_in.json',
                                    api_key: api_key,
                                    email: credentials[:username],
@@ -227,7 +227,7 @@ class Jandy < Thor
         JSON.parse response
       end
 
-      status = with_rescue([RestClient::BadGateway, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout], @logger) do |_try|
+      status = with_rescue([RestClient::BadGateway, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError], @logger) do |_try|
         response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
                                   params: { actionID: 'command',
                                             command: 'get_home',
@@ -247,7 +247,7 @@ class Jandy < Thor
         return
       end
 
-      devices = with_rescue([RestClient::BadGateway, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout], @logger) do |_try|
+      devices = with_rescue([RestClient::BadGateway, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError], @logger) do |_try|
         response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
                                   params: { actionID: 'command',
                                             command: 'get_devices',
