@@ -21,6 +21,7 @@ module Kernel
       raise if try > retries
 
       logger.info "caught error #{e.class}, retrying (#{try}/#{retries})..."
+      sleep 10
       retry
     end
   end
