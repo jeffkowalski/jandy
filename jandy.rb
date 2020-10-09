@@ -228,7 +228,7 @@ class Jandy < Thor
         JSON.parse response
       end
 
-      status = with_rescue([RestClient::BadGateway, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError], @logger) do |_try|
+      status = with_rescue([RestClient::BadGateway, RestClient::BadRequest, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError], @logger) do |_try|
         response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
                                   params: { actionID: 'command',
                                             command: 'get_home',
