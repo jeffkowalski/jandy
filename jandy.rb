@@ -44,7 +44,7 @@ class Jandy < Thor
     def setup_logger
       redirect_output if options[:log]
 
-      @logger = Logger.new STDOUT
+      @logger = Logger.new $stdout
       @logger.level = options[:verbose] ? Logger::DEBUG : Logger::INFO
       @logger.info 'starting'
     end
