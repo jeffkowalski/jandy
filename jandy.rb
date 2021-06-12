@@ -50,6 +50,15 @@ class Jandy < Thor
     end
   end
 
+  AQUALINK_LOGIN_URL    = 'https://prod.zodiac-io.com/users/v1/login'
+  AQUALINK_DEVICES_URL  = 'https://r-api.iaqualink.net/devices.json'
+  AQUALINK_SESSION_URL  = 'https://p-api.iaqualink.net/v1/mobile/session.json'
+  AQUALINK_API_KEY      = 'EOOEMOW4YR6QNB07'
+  AQUALINK_HTTP_HEADERS = {
+    user_agent:   'okhttp/3.14.7',
+    content_type: 'application/json'
+  }.freeze
+
   class_option :log,     type: :boolean, default: true, desc: "log output to #{LOGFILE}"
   class_option :verbose, type: :boolean, aliases: '-v', desc: 'increase verbosity'
 
@@ -74,28 +83,37 @@ class Jandy < Thor
   def test
     setup_logger
 
-    require 'yaml'
-    require 'rest-client'
-    require 'json'
-
-    api_key = 'EOOEMOW4YR6QNB07'
     credentials = YAML.load_file CREDENTIALS_PATH
 
     @logger.info 'Session'
-    response = RestClient.post 'https://support.iaqualink.com/users/sign_in.json',
-                               api_key: api_key,
-                               email: credentials[:username],
-                               password: credentials[:password]
+    response = RestClient::Request.new({ method: :post,
+                                         url: AQUALINK_LOGIN_URL,
+                                         payload: { api_key: AQUALINK_API_KEY,
+                                                    email: credentials[:username],
+                                                    password: credentials[:password]
+                                                  }.to_json,
+                                         headers: AQUALINK_HTTP_HEADERS
+                                       }).execute do |response, request, result|
+      case response.code
+      when 200
+        response
+      else
+        raise "Invalid response #{response.to_str} received."
+      end
+    end
     session = JSON.parse response
     puts session
 
+    # response = RestClient.post AQUALINK_LOGIN_URL,
+    #                            api_key: api_key,
+    #                            email: credentials[:username],
+    #                            password: credentials[:password]
+    # session = JSON.parse response
+    # puts session
+
     @logger.info 'get_devices'
-    response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
-                              headers: {
-                                user_agent: 'iAquaLink/70 CFNetwork/901.1 Darwin/17.6.0',
-                                content_type: 'application/json',
-                                accept: '*/*'
-                              },
+    response = RestClient.get AQUALINK_SESSION_URL,
+                              headers: AQUALINK_HTTP_HEADERS,
                               params: {
                                 actionID: 'command',
                                 command: 'get_devices',
@@ -122,15 +140,15 @@ class Jandy < Thor
     puts cleaner
 
     @logger.info 'devices.json'
-    res = RestClient.get 'https://support.iaqualink.com/devices.json',
-                         params: { api_key: api_key,
+    res = RestClient.get AQUALINK_DEVICES_URL,
+                         params: { api_key: AQUALINK_API_KEY,
                                    authentication_token: session['authentication_token'],
                                    user_id: session['id'] }
     devices = JSON.parse res
     puts devices
 
     @logger.info 'get_home'
-    response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+    response = RestClient.get AQUALINK_SESSION_URL,
                               params: { actionID: 'command',
                                         command: 'get_home',
                                         attached_test: 'true',
@@ -158,7 +176,7 @@ class Jandy < Thor
     puts measures.join ' '
 
     @logger.info 'get_onetouch'
-    response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+    response = RestClient.get AQUALINK_SESSION_URL,
                               params: { actionID: 'command',
                                         command: 'get_onetouch',
                                         serial: credentials[:serial_number],
@@ -178,20 +196,26 @@ class Jandy < Thor
   def describe_status
     setup_logger
 
-    require 'yaml'
-    require 'rest-client'
-    require 'json'
-
-    api_key = 'EOOEMOW4YR6QNB07'
     credentials = YAML.load_file CREDENTIALS_PATH
 
-    response = RestClient.post 'https://support.iaqualink.com/users/sign_in.json',
-                               api_key: api_key,
-                               email: credentials[:username],
-                               password: credentials[:password]
+    response = RestClient::Request.new({ method: :post,
+                                         url: AQUALINK_LOGIN_URL,
+                                         payload: { api_key: AQUALINK_API_KEY,
+                                                    email: credentials[:username],
+                                                    password: credentials[:password]
+                                                  }.to_json,
+                                         headers: AQUALINK_HTTP_HEADERS
+                                       }).execute do |response, request, result|
+      case response.code
+      when 200
+        response
+      else
+        raise "Invalid response #{response.to_str} received."
+      end
+    end
     session = JSON.parse response
 
-    response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+    response = RestClient.get AQUALINK_SESSION_URL,
                               params: { actionID: 'command',
                                         command: 'get_home',
                                         serial: credentials[:serial_number],
@@ -199,7 +223,7 @@ class Jandy < Thor
     status = JSON.parse response
     status = status['home_screen'].reduce(:merge)
 
-    response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+    response = RestClient.get AQUALINK_SESSION_URL,
                               params: { actionID: 'command',
                                         command: 'get_devices',
                                         serial: credentials[:serial_number],
@@ -224,19 +248,24 @@ class Jandy < Thor
     setup_logger
 
     begin
-      api_key = 'EOOEMOW4YR6QNB07'
       credentials = YAML.load_file CREDENTIALS_PATH
 
       session = with_rescue([RestClient::BadGateway, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError], @logger) do |_try|
-        response = RestClient.post 'https://support.iaqualink.com/users/sign_in.json',
-                                   api_key: api_key,
-                                   email: credentials[:username],
-                                   password: credentials[:password]
+        response = RestClient::Request.new({ method: :post,
+                                             url: AQUALINK_LOGIN_URL,
+                                             payload: { api_key: AQUALINK_API_KEY,
+                                                        email: credentials[:username],
+                                                        password: credentials[:password]
+                                                      }.to_json,
+                                             headers: AQUALINK_HTTP_HEADERS
+                                           }).execute do |response, request, result|
+          response
+        end
         JSON.parse response
       end
 
       status = with_rescue([RestClient::BadGateway, RestClient::BadRequest, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError], @logger, retries: 10) do |_try|
-        response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+        response = RestClient.get AQUALINK_SESSION_URL,
                                   params: { actionID: 'command',
                                             command: 'get_home',
                                             serial: credentials[:serial_number],
@@ -256,7 +285,7 @@ class Jandy < Thor
       end
 
       devices = with_rescue([RestClient::BadGateway, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError], @logger) do |_try|
-        response = RestClient.get 'https://iaqualink-api.realtime.io/v1/mobile/session.json',
+        response = RestClient.get AQUALINK_SESSION_URL,
                                   params: { actionID: 'command',
                                             command: 'get_devices',
                                             serial: credentials[:serial_number],
