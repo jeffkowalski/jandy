@@ -250,47 +250,53 @@ class Jandy < Thor
     begin
       credentials = YAML.load_file CREDENTIALS_PATH
 
-      session = with_rescue([RestClient::BadGateway, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError], @logger) do |_try|
-        response = RestClient::Request.new({ method: :post,
-                                             url: AQUALINK_LOGIN_URL,
-                                             payload: { api_key: AQUALINK_API_KEY,
-                                                        email: credentials[:username],
-                                                        password: credentials[:password]
-                                                      }.to_json,
-                                             headers: AQUALINK_HTTP_HEADERS
-                                           }).execute do |response, request, result|
-          response
+      soft_faults = [RestClient::BadGateway, RestClient::BadRequest, RestClient::GatewayTimeout, RestClient::InternalServerError, RestClient::ServiceUnavailable, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError]
+
+      status = nil
+      devices = nil
+      with_rescue(RestClient::Unauthorized, @logger) do |_try2|
+        session = with_rescue(soft_faults, @logger) do |_try|
+          response = RestClient::Request.new({ method: :post,
+                                               url: AQUALINK_LOGIN_URL,
+                                               payload: { api_key: AQUALINK_API_KEY,
+                                                          email: credentials[:username],
+                                                          password: credentials[:password]
+                                                        }.to_json,
+                                               headers: AQUALINK_HTTP_HEADERS
+                                             }).execute do |response, request, result|
+            response
+          end
+          JSON.parse response
         end
-        JSON.parse response
-      end
 
-      status = with_rescue([RestClient::BadGateway, RestClient::BadRequest, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError], @logger, retries: 10) do |_try|
-        response = RestClient.get AQUALINK_SESSION_URL,
-                                  params: { actionID: 'command',
-                                            command: 'get_home',
-                                            serial: credentials[:serial_number],
-                                            sessionID: session['session_id'] }
-        JSON.parse response
-      end
-      status = status['home_screen'].reduce(:merge)
-      @logger.info status
+        status = with_rescue(soft_faults, @logger, retries: 10) do |_try|
+          response = RestClient.get AQUALINK_SESSION_URL,
+                                    params: { actionID: 'command',
+                                              command: 'get_home',
+                                              serial: credentials[:serial_number],
+                                              sessionID: session['session_id'] }
+          JSON.parse response
+        end
+        status = status['home_screen'].reduce(:merge)
+        @logger.info status
 
-      case status['status']
-      when 'Service'
-        @logger.info 'in service mode, cannot query devices'
-        return
-      when 'Offline'
-        @logger.info 'offline, cannot query devices'
-        return
-      end
+        case status['status']
+        when 'Service'
+          @logger.info 'in service mode, cannot query devices'
+          return
+        when 'Offline'
+          @logger.info 'offline, cannot query devices'
+          return
+        end
 
-      devices = with_rescue([RestClient::BadGateway, RestClient::GatewayTimeout, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError], @logger) do |_try|
-        response = RestClient.get AQUALINK_SESSION_URL,
-                                  params: { actionID: 'command',
-                                            command: 'get_devices',
-                                            serial: credentials[:serial_number],
-                                            sessionID: session['session_id'] }
-        JSON.parse response
+        devices = with_rescue(soft_faults, @logger) do |_try|
+          response = RestClient.get AQUALINK_SESSION_URL,
+                                    params: { actionID: 'command',
+                                              command: 'get_devices',
+                                              serial: credentials[:serial_number],
+                                              sessionID: session['session_id'] }
+          JSON.parse response
+        end
       end
 
       aux = devices['devices_screen'].select do |node|
