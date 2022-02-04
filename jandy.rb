@@ -254,7 +254,7 @@ class Jandy < Thor
 
       status = nil
       devices = nil
-      with_rescue(RestClient::Unauthorized, @logger) do |_try2|
+      with_rescue([RestClient::Unauthorized], @logger) do |_try2|
         session = with_rescue(soft_faults, @logger) do |_try|
           response = RestClient::Request.new({ method: :post,
                                                url: AQUALINK_LOGIN_URL,
