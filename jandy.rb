@@ -1,55 +1,11 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'date'
-require 'thor'
-require 'influxdb'
-require 'yaml'
-require 'rest-client'
-require 'json'
+require 'rubygems'
+require 'bundler/setup'
+Bundler.require(:default)
 
-LOGFILE = File.join(Dir.home, '.log', 'jandy.log')
-CREDENTIALS_PATH = File.join(Dir.home, '.credentials', 'iaqualink.yaml')
-
-module Kernel
-  def with_rescue(exceptions, logger, retries: 5)
-    try = 0
-    begin
-      yield try
-    rescue *exceptions => e
-      try += 1
-      raise if try > retries
-
-      logger.info "caught error #{e.class}, retrying (#{try}/#{retries})..."
-      sleep 10
-      retry
-    end
-  end
-end
-
-class Jandy < Thor
-  no_commands do
-    def redirect_output
-      unless LOGFILE == 'STDOUT'
-        logfile = File.expand_path(LOGFILE)
-        FileUtils.mkdir_p(File.dirname(logfile), mode: 0o755)
-        FileUtils.touch logfile
-        File.chmod 0o644, logfile
-        $stdout.reopen logfile, 'a'
-      end
-      $stderr.reopen $stdout
-      $stdout.sync = $stderr.sync = true
-    end
-
-    def setup_logger
-      redirect_output if options[:log]
-
-      @logger = Logger.new $stdout
-      @logger.level = options[:verbose] ? Logger::DEBUG : Logger::INFO
-      @logger.info 'starting'
-    end
-  end
-
+class Jandy < RecorderBotBase
   AQUALINK_LOGIN_URL    = 'https://prod.zodiac-io.com/users/v1/login'
   AQUALINK_DEVICES_URL  = 'https://r-api.iaqualink.net/devices.json'
   AQUALINK_SESSION_URL  = 'https://p-api.iaqualink.net/v1/mobile/session.json'
@@ -58,9 +14,6 @@ class Jandy < Thor
     user_agent:   'okhttp/3.14.7',
     content_type: 'application/json'
   }.freeze
-
-  class_option :log,     type: :boolean, default: true, desc: "log output to #{LOGFILE}"
-  class_option :verbose, type: :boolean, aliases: '-v', desc: 'increase verbosity'
 
   no_commands do
     def describe_mode(mode)
@@ -81,9 +34,7 @@ class Jandy < Thor
 
   desc 'test', 'testing'
   def test
-    setup_logger
-
-    credentials = YAML.load_file CREDENTIALS_PATH
+    credentials = load_credentials 'iaqualink'
 
     @logger.info 'Session'
     response = RestClient::Request.new({ method: :post,
@@ -194,9 +145,7 @@ class Jandy < Thor
 
   desc 'describe-status', 'describe the current state of the pool'
   def describe_status
-    setup_logger
-
-    credentials = YAML.load_file CREDENTIALS_PATH
+    credentials = load_credentials 'iaqualink'
 
     response = RestClient::Request.new({ method: :post,
                                          url: AQUALINK_LOGIN_URL,
@@ -242,13 +191,9 @@ class Jandy < Thor
     puts text
   end
 
-  desc 'record-status', 'record the current state of the pool to database'
-  method_option :dry_run, type: :boolean, aliases: '-d', desc: 'do not write to database'
-  def record_status
-    setup_logger
-
-    begin
-      credentials = YAML.load_file CREDENTIALS_PATH
+  no_commands do
+    def main
+      credentials = load_credentials 'iaqualink'
 
       soft_faults = [RestClient::BadGateway, RestClient::BadRequest, RestClient::GatewayTimeout, RestClient::InternalServerError, RestClient::ServiceUnavailable, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError]
 
@@ -340,8 +285,6 @@ class Jandy < Thor
         }
         influxdb.write_point('air_temp', data) unless options[:dry_run]
       end
-    rescue StandardError => e
-      @logger.error e
     end
   end
 end
