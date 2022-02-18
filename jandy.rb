@@ -41,10 +41,8 @@ class Jandy < RecorderBotBase
                                          url: AQUALINK_LOGIN_URL,
                                          payload: { api_key: AQUALINK_API_KEY,
                                                     email: credentials[:username],
-                                                    password: credentials[:password]
-                                                  }.to_json,
-                                         headers: AQUALINK_HTTP_HEADERS
-                                       }).execute do |response, request, result|
+                                                    password: credentials[:password] }.to_json,
+                                         headers: AQUALINK_HTTP_HEADERS }).execute do |response, request, result|
       case response.code
       when 200
         response
@@ -151,10 +149,8 @@ class Jandy < RecorderBotBase
                                          url: AQUALINK_LOGIN_URL,
                                          payload: { api_key: AQUALINK_API_KEY,
                                                     email: credentials[:username],
-                                                    password: credentials[:password]
-                                                  }.to_json,
-                                         headers: AQUALINK_HTTP_HEADERS
-                                       }).execute do |response, request, result|
+                                                    password: credentials[:password] }.to_json,
+                                         headers: AQUALINK_HTTP_HEADERS }).execute do |response, request, result|
       case response.code
       when 200
         response
@@ -205,10 +201,8 @@ class Jandy < RecorderBotBase
                                                url: AQUALINK_LOGIN_URL,
                                                payload: { api_key: AQUALINK_API_KEY,
                                                           email: credentials[:username],
-                                                          password: credentials[:password]
-                                                        }.to_json,
-                                               headers: AQUALINK_HTTP_HEADERS
-                                             }).execute do |response, request, result|
+                                                          password: credentials[:password] }.to_json,
+                                               headers: AQUALINK_HTTP_HEADERS }).execute do |response, request, result|
             response
           end
           JSON.parse response
@@ -252,39 +246,19 @@ class Jandy < RecorderBotBase
       influxdb = InfluxDB::Client.new 'jandy'
       timestamp = Time.now.to_i
 
-      data = {
-        values: { value: status['pool_pump'].to_i, description: describe_mode(status['pool_pump']) },
-        timestamp: timestamp
-      }
-      influxdb.write_point('filter_pump', data) unless options[:dry_run]
+      data = [{ series: 'filter_pump',
+                values: { value: status['pool_pump'].to_i, description: describe_mode(status['pool_pump']) },
+                timestamp: timestamp },
+              { series: 'solar_heater',
+                values: { value: status['solar_heater'].to_i, description: describe_mode(status['solar_heater']) },
+                timestamp: timestamp },
+              { series: 'cleaner',
+                values: { value: cleaner['state'].to_i, description: describe_mode(cleaner['state']) },
+                timestamp: timestamp }]
+      data.push({ series: 'pool_temp', values: { value: status['pool_temp'].to_i }, timestamp: timestamp }) unless status['pool_temp'].empty?
+      data.push({ series: 'air_temp',  values: { value: status['air_temp'].to_i },  timestamp: timestamp }) unless status['air_temp'].empty?
 
-      data = {
-        values: { value: status['solar_heater'].to_i, description: describe_mode(status['solar_heater']) },
-        timestamp: timestamp
-      }
-      influxdb.write_point('solar_heater', data) unless options[:dry_run]
-
-      data = {
-        values: { value: cleaner['state'].to_i, description: describe_mode(cleaner['state']) },
-        timestamp: timestamp
-      }
-      influxdb.write_point('cleaner', data) unless options[:dry_run]
-
-      unless status['pool_temp'].empty?
-        data = {
-          values: { value: status['pool_temp'].to_i },
-          timestamp: timestamp
-        }
-        influxdb.write_point('pool_temp', data) unless options[:dry_run]
-      end
-
-      unless status['air_temp'].empty?
-        data = {
-          values: { value: status['air_temp'].to_i },
-          timestamp: timestamp
-        }
-        influxdb.write_point('air_temp', data) unless options[:dry_run]
-      end
+      influxdb.write_points data unless options[:dry_run]
     end
   end
 end
