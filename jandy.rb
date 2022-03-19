@@ -32,6 +32,69 @@ class Jandy < RecorderBotBase
     end
   end
 
+  no_commands do
+    def get_status(credentials)
+      soft_faults = [OpenSSL::SSL::SSLError,
+                     RestClient::Exceptions::OpenTimeout,
+                     RestClient::BadGateway,
+                     RestClient::BadRequest,
+                     RestClient::GatewayTimeout,
+                     RestClient::InternalServerError,
+                     RestClient::ServiceUnavailable]
+      status = nil
+      cleaner = nil
+      with_rescue([RestClient::Unauthorized], @logger) do |_try2|
+        session = with_rescue(soft_faults, @logger) do |_try|
+          response = RestClient::Request.new({ method: :post,
+                                               url: AQUALINK_LOGIN_URL,
+                                               payload: { api_key: AQUALINK_API_KEY,
+                                                          email: credentials[:username],
+                                                          password: credentials[:password] }.to_json,
+                                               headers: AQUALINK_HTTP_HEADERS }).execute do |response, request, result|
+            response
+          end
+          JSON.parse response
+        end
+
+        status = with_rescue(soft_faults, @logger, retries: 10) do |_try|
+          response = RestClient.get AQUALINK_SESSION_URL,
+                                    params: { actionID: 'command',
+                                              command: 'get_home',
+                                              serial: credentials[:serial_number],
+                                              sessionID: session['session_id'] }
+          JSON.parse response
+        end
+        status = status['home_screen'].reduce(:merge)
+        @logger.info status
+
+        case status['status']
+        when 'Service'
+          @logger.info 'in service mode, cannot query devices'
+          return
+        when 'Offline'
+          @logger.info 'offline, cannot query devices'
+          return
+        end
+
+        devices = with_rescue(soft_faults, @logger) do |_try|
+          response = RestClient.get AQUALINK_SESSION_URL,
+                                    params: { actionID: 'command',
+                                              command: 'get_devices',
+                                              serial: credentials[:serial_number],
+                                              sessionID: session['session_id'] }
+          JSON.parse response
+        end
+
+        aux = devices['devices_screen'].select do |node|
+          !node.keys.grep(/aux_/).empty? && (node.values.first.reduce({}, :merge)['label'] == 'Cleaner')
+        end
+        cleaner = aux.first.values.first.reduce({}, :merge)
+        @logger.info cleaner
+      end
+      [status, cleaner]
+    end
+  end
+
   desc 'test', 'testing'
   def test
     credentials = load_credentials 'iaqualink'
@@ -143,41 +206,12 @@ class Jandy < RecorderBotBase
 
   desc 'describe-status', 'describe the current state of the pool'
   def describe_status
+    @logger = Logger.new $stdout
+    @logger.level = Logger::WARN
     credentials = load_credentials 'iaqualink'
 
-    response = RestClient::Request.new({ method: :post,
-                                         url: AQUALINK_LOGIN_URL,
-                                         payload: { api_key: AQUALINK_API_KEY,
-                                                    email: credentials[:username],
-                                                    password: credentials[:password] }.to_json,
-                                         headers: AQUALINK_HTTP_HEADERS }).execute do |response, request, result|
-      case response.code
-      when 200
-        response
-      else
-        raise "Invalid response #{response.to_str} received."
-      end
-    end
-    session = JSON.parse response
-
-    response = RestClient.get AQUALINK_SESSION_URL,
-                              params: { actionID: 'command',
-                                        command: 'get_home',
-                                        serial: credentials[:serial_number],
-                                        sessionID: session['session_id'] }
-    status = JSON.parse response
-    status = status['home_screen'].reduce(:merge)
-
-    response = RestClient.get AQUALINK_SESSION_URL,
-                              params: { actionID: 'command',
-                                        command: 'get_devices',
-                                        serial: credentials[:serial_number],
-                                        sessionID: session['session_id'] }
-    devices = JSON.parse response
-    aux = devices['devices_screen'].select do |node|
-      !node.keys.grep(/aux_/).empty? && (node.values.first.reduce({}, :merge)['label'] == 'Cleaner')
-    end
-    cleaner = aux.first.values.first.reduce({}, :merge)
+    status, cleaner = get_status credentials
+    return if status.nil? || cleaner.nil?
 
     text = ["The pool temperature is #{status['pool_temp'].empty? ? 'unknown' : (status['pool_temp'] + ' degrees')}.",
             "The air temperature is #{status['air_temp'].empty? ? 'unknown' : (status['air_temp'] + ' degrees')}.",
@@ -191,57 +225,8 @@ class Jandy < RecorderBotBase
     def main
       credentials = load_credentials 'iaqualink'
 
-      soft_faults = [RestClient::BadGateway, RestClient::BadRequest, RestClient::GatewayTimeout, RestClient::InternalServerError, RestClient::ServiceUnavailable, RestClient::Exceptions::OpenTimeout, OpenSSL::SSL::SSLError]
-
-      status = nil
-      devices = nil
-      with_rescue([RestClient::Unauthorized], @logger) do |_try2|
-        session = with_rescue(soft_faults, @logger) do |_try|
-          response = RestClient::Request.new({ method: :post,
-                                               url: AQUALINK_LOGIN_URL,
-                                               payload: { api_key: AQUALINK_API_KEY,
-                                                          email: credentials[:username],
-                                                          password: credentials[:password] }.to_json,
-                                               headers: AQUALINK_HTTP_HEADERS }).execute do |response, request, result|
-            response
-          end
-          JSON.parse response
-        end
-
-        status = with_rescue(soft_faults, @logger, retries: 10) do |_try|
-          response = RestClient.get AQUALINK_SESSION_URL,
-                                    params: { actionID: 'command',
-                                              command: 'get_home',
-                                              serial: credentials[:serial_number],
-                                              sessionID: session['session_id'] }
-          JSON.parse response
-        end
-        status = status['home_screen'].reduce(:merge)
-        @logger.info status
-
-        case status['status']
-        when 'Service'
-          @logger.info 'in service mode, cannot query devices'
-          return
-        when 'Offline'
-          @logger.info 'offline, cannot query devices'
-          return
-        end
-
-        devices = with_rescue(soft_faults, @logger) do |_try|
-          response = RestClient.get AQUALINK_SESSION_URL,
-                                    params: { actionID: 'command',
-                                              command: 'get_devices',
-                                              serial: credentials[:serial_number],
-                                              sessionID: session['session_id'] }
-          JSON.parse response
-        end
-      end
-
-      aux = devices['devices_screen'].select do |node|
-        !node.keys.grep(/aux_/).empty? && (node.values.first.reduce({}, :merge)['label'] == 'Cleaner')
-      end
-      cleaner = aux.first.values.first.reduce({}, :merge)
+      status, cleaner = get_status(credentials)
+      return if status.nil? || cleaner.nil?
 
       influxdb = InfluxDB::Client.new 'jandy'
       timestamp = Time.now.to_i
