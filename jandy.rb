@@ -40,7 +40,8 @@ class Jandy < RecorderBotBase
                      RestClient::BadRequest,
                      RestClient::GatewayTimeout,
                      RestClient::InternalServerError,
-                     RestClient::ServiceUnavailable]
+                     RestClient::ServiceUnavailable,
+                     SocketError]
       status = nil
       cleaner = nil
       with_rescue([RestClient::Unauthorized], @logger) do |_try2|
