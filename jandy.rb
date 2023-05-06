@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require 'rubygems'
 require 'bundler/setup'
 Bundler.require(:default)
 
@@ -51,8 +50,8 @@ class Jandy < RecorderBotBase
                                                payload: { api_key: AQUALINK_API_KEY,
                                                           email: credentials[:username],
                                                           password: credentials[:password] }.to_json,
-                                               headers: AQUALINK_HTTP_HEADERS }).execute do |response, request, result|
-            response
+                                               headers: AQUALINK_HTTP_HEADERS }).execute do |reply, _request, _result|
+            reply
           end
           JSON.parse response
         end
@@ -106,12 +105,12 @@ class Jandy < RecorderBotBase
                                          payload: { api_key: AQUALINK_API_KEY,
                                                     email: credentials[:username],
                                                     password: credentials[:password] }.to_json,
-                                         headers: AQUALINK_HTTP_HEADERS }).execute do |response, request, result|
-      case response.code
+                                         headers: AQUALINK_HTTP_HEADERS }).execute do |reply, _request, _result|
+      case reply.code
       when 200
-        response
+        reply
       else
-        raise "Invalid response #{response.to_str} received."
+        raise "Invalid response #{reply.to_str} received."
       end
     end
     session = JSON.parse response
@@ -205,6 +204,12 @@ class Jandy < RecorderBotBase
     # p response.to_hash
   end
 
+  no_commands do
+    def describe_temp(temp)
+      temp.empty? ? 'unknown' : "#{temp} degrees"
+    end
+  end
+
   desc 'describe-status', 'describe the current state of the pool'
   def describe_status
     @logger = Logger.new $stdout
@@ -214,8 +219,8 @@ class Jandy < RecorderBotBase
     status, cleaner = get_status credentials
     return if status.nil? || cleaner.nil?
 
-    text = ["The pool temperature is #{status['pool_temp'].empty? ? 'unknown' : (status['pool_temp'] + ' degrees')}.",
-            "The air temperature is #{status['air_temp'].empty? ? 'unknown' : (status['air_temp'] + ' degrees')}.",
+    text = ["The pool temperature is #{describe_temp status['pool_temp']}",
+            "The air temperature is #{describe_temp status['air_temp']}",
             "The filter pump is #{describe_mode status['pool_pump']}.",
             "The solar panels are #{describe_mode status['solar_heater']}.",
             "The cleaner is #{describe_mode cleaner['state']}."].join "\n"

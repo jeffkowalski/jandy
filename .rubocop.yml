@@ -4,6 +4,9 @@ AllCops:
 Layout/EmptyLines:
   Enabled: false
 
+Layout/HashAlignment:
+  Enabled: false
+
 Layout/LineLength:
   Enabled: false
 
