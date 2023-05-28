@@ -33,7 +33,8 @@ class Jandy < RecorderBotBase
 
   no_commands do
     def get_status(credentials)
-      soft_faults = [OpenSSL::SSL::SSLError,
+      soft_faults = [NoMethodError,  # for derefing a nil result
+                     OpenSSL::SSL::SSLError,
                      RestClient::Exceptions::OpenTimeout,
                      RestClient::BadGateway,
                      RestClient::BadRequest,
