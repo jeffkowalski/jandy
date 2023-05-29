@@ -77,20 +77,20 @@ class Jandy < RecorderBotBase
           return
         end
 
-        devices = with_rescue(soft_faults, @logger) do |_try|
+        cleaner = with_rescue(soft_faults, @logger) do |_try|
           response = RestClient.get AQUALINK_SESSION_URL,
                                     params: { actionID: 'command',
                                               command: 'get_devices',
                                               serial: credentials[:serial_number],
                                               sessionID: session['session_id'] }
-          JSON.parse response
+          devices = JSON.parse response
+          aux = devices['devices_screen'].select do |node|
+            !node.keys.grep(/aux_/).empty? && (node.values.first.reduce({}, :merge)['label'] == 'Cleaner')
+          end
+          aux.first.values.first.reduce({}, :merge)
         end
-
-        aux = devices['devices_screen'].select do |node|
-          !node.keys.grep(/aux_/).empty? && (node.values.first.reduce({}, :merge)['label'] == 'Cleaner')
-        end
-        cleaner = aux.first.values.first.reduce({}, :merge)
         @logger.info cleaner
+
       end
       [status, cleaner]
     end
