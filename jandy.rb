@@ -33,7 +33,7 @@ class Jandy < RecorderBotBase
 
   no_commands do
     def get_status(credentials)
-      soft_faults = [NoMethodError,  # for derefing a nil result
+      soft_faults = [NoMethodError, # for derefing a nil result
                      OpenSSL::SSL::SSLError,
                      RestClient::Exceptions::OpenTimeout,
                      RestClient::BadGateway,
@@ -83,6 +83,7 @@ class Jandy < RecorderBotBase
                                               command: 'get_devices',
                                               serial: credentials[:serial_number],
                                               sessionID: session['session_id'] }
+          # @logger.info "devices response: #{response}"
           devices = JSON.parse response
           aux = devices['devices_screen'].select do |node|
             !node.keys.grep(/aux_/).empty? && (node.values.first.reduce({}, :merge)['label'] == 'Cleaner')
@@ -90,7 +91,6 @@ class Jandy < RecorderBotBase
           aux.first.values.first.reduce({}, :merge)
         end
         @logger.info cleaner
-
       end
       [status, cleaner]
     end
